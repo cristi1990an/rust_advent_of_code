@@ -1,6 +1,4 @@
-use std::usize;
-
-use itertools::iproduct;
+use itertools::Itertools;
 
 fn read_input() -> Vec<(u64, Vec<u64>)> {
     use std::fs::File;
@@ -26,65 +24,75 @@ fn read_input() -> Vec<(u64, Vec<u64>)> {
     return result;
 }
 
-fn read_bit_at_index(num: u64, index: usize) -> bool {
-    return num & (1 << index) != 0;
-}
+fn generate_combinations_helper(
+    n: u32,
+    current: Vec<&'static str>,
+    result: &mut Vec<Vec<&'static str>>,
+    operators: &[&'static str],
+) {
+    if current.len() == n.try_into().unwrap() {
+        result.push(current);
+        return;
+    }
 
-fn generate_combinations(size: usize) {
-    let symbols = vec!["*".to_string(), "+".to_string(), "||".to_string()];
-    let combinations = vec![symbols; size];
-
-    // Generate Cartesian product of the symbols repeated `size` times
-    for combination in iproduct!(combinations) {
-        println!("{:?}", combination);
+    for &op in operators {
+        let mut next = current.clone();
+        next.push(op);
+        generate_combinations_helper(n, next, result, operators);
     }
 }
 
+fn generate_combinations(n: u32, operators: &[&'static str]) -> Vec<Vec<&'static str>> {
+    let mut result: Vec<Vec<&'static str>> = Vec::with_capacity(operators.len().pow(n));
+    generate_combinations_helper(
+        n,
+        Vec::with_capacity(operators.len()),
+        &mut result,
+        operators,
+    );
+
+    return result;
+}
+
 fn main() {
-    generate_combinations(4);
+    let input = read_input();
+    let mut total_calibration_result = 0u64;
 
-    // let input = read_input();
-    // let mut total_calibration = 0u64;
+    let evaluator = |lhs: u64, (rhs, operation): (&u64, &str)| -> u64 {
+        match operation {
+            "+" => lhs + rhs,
+            "*" => lhs * rhs,
+            "||" => format!("{}{}", lhs, rhs).parse::<u64>().unwrap(),
+            _ => panic!("Shouldn't happen"),
+        }
+    };
 
-    // for (sum, values) in &input {
-    //     println!("{}: {:?}", sum, values);
-    // }
+    for (sum, operators) in input {
+        println!("{}: {:?}", sum, operators);
 
-    // println!("\nResults:\n");
+        for combo in
+            generate_combinations((operators.len() - 1).try_into().unwrap(), &["+", "*", "||"])
+        {
+            let (first, rest) = operators.split_first().unwrap();
+            let zipped_with_operation = rest.iter().zip(combo.iter().cloned());
+            let result = zipped_with_operation.fold(*first, evaluator);
 
-    // for (sum, values) in input {
-    //     for val in 0..1 << values.len() {
-    //         let mut index = 0;
-    //         let (first, rest) = values.split_first().unwrap();
-    //         let result = rest.iter().fold(*first, |lhs, rhs| {
-    //             let cpy = index;
-    //             index += 1;
-    //             if read_bit_at_index(val, cpy) == false {
-    //                 return lhs * rhs;
-    //             } else {
-    //                 return lhs + rhs;
-    //             }
-    //         });
+            if result == sum {
+                print!("Solution found: ");
+                print!("{}", operators.first().unwrap());
 
-    //         if result == sum {
-    //             let (first, rest) = values.split_first().unwrap();
-    //             print!("{sum} = {first} ");
+                for (op, value) in combo.iter().zip(operators.split_first().unwrap().1) {
+                    print!("{op}{value}");
+                }
 
-    //             for i in 0..rest.len() {
-    //                 if read_bit_at_index(val, i) == false {
-    //                     print!("* ");
-    //                 } else {
-    //                     print!("+ ");
-    //                 }
-    //                 print!("{} ", rest[i]);
-    //             }
-    //             println!();
+                println!();
 
-    //             total_calibration += sum;
-    //             break;
-    //         }
-    //     }
-    // }
+                total_calibration_result += sum;
 
-    // println!("Total calibration result: {total_calibration}");
+                break;
+            }
+        }
+    }
+
+    println!("Total calibration result = {total_calibration_result}");
 }
